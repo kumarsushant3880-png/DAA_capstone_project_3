@@ -1,0 +1,4 @@
+Huffman coding is a lossless compression algorithm.
+Frequent symbols receive shorter prefix codes.
+This sample includes repeated letters to make the compression idea visible.
+Huffman coding is useful for explaining trees, heaps, and greedy algorithms.
