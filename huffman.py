@@ -8,10 +8,12 @@ and self-contained for an algorithms capstone demonstration.
 from __future__ import annotations
 
 import argparse
+import csv
 import heapq
 import json
-import os
 import struct
+import statistics
+import sys
 import time
 from collections import Counter
 from dataclasses import dataclass
@@ -160,6 +162,39 @@ def decompress_file(source: Path, destination: Path) -> int:
     return len(decoded)
 
 
+def run_benchmark(repeats: int = 7) -> list[dict[str, str | int | float]]:
+    """Compare size and median encoding time on six reproducible byte inputs."""
+    import random
+
+    rng = random.Random(2026)
+    cases = [
+        ("repeated_pattern_4k", (b"ABRACADABRA! " * 316)[:4096]),
+        ("english_like_4k", (b"the quick brown fox jumps over the lazy dog. " * 100)[:4096]),
+        ("uniform_bytes_4k", bytes(rng.randrange(256) for _ in range(4096))),
+        ("repeated_pattern_64k", (b"ABRACADABRA! " * 5042)[:65536]),
+        ("english_like_64k", (b"the quick brown fox jumps over the lazy dog. " * 2000)[:65536]),
+        ("uniform_bytes_64k", bytes(rng.randrange(256) for _ in range(65536))),
+    ]
+    results = []
+    for name, data in cases:
+        samples = []
+        archive = b""
+        for _ in range(repeats):
+            start = time.perf_counter()
+            archive = encode_bytes(data)
+            samples.append(time.perf_counter() - start)
+        results.append({
+            "input": name,
+            "input_bytes": len(data),
+            "distinct_bytes": len(set(data)),
+            "archive_bytes": len(archive),
+            "ratio": round(len(archive) / len(data), 4),
+            "median_encode_ms": round(statistics.median(samples) * 1000, 3),
+            "repeats": repeats,
+        })
+    return results
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compress or decompress using Huffman coding.")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -169,6 +204,9 @@ def main() -> None:
     decomp = commands.add_parser("decompress", help="restore a HUF1 archive")
     decomp.add_argument("input", type=Path)
     decomp.add_argument("output", type=Path)
+    bench = commands.add_parser("benchmark", help="compare compression size and speed on sample data")
+    bench.add_argument("--repeats", type=int, default=7)
+    bench.add_argument("--csv", type=Path, help="optional path for saving results as CSV")
     args = parser.parse_args()
     if args.command == "compress":
         stats = compress_file(args.input, args.output)
@@ -177,9 +215,21 @@ def main() -> None:
         print(f"Ratio:    {stats['ratio']:.3f}")
         print(f"Saved:    {stats['space_saved_percent']:.2f}%")
         print(f"Encode:   {stats['encode_seconds']:.6f} seconds")
-    else:
+    elif args.command == "decompress":
         restored = decompress_file(args.input, args.output)
         print(f"Restored {restored} bytes to {args.output}")
+    else:
+        if args.repeats < 1:
+            parser.error("--repeats must be at least 1")
+        rows = run_benchmark(args.repeats)
+        if args.csv:
+            with args.csv.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=rows[0].keys())
+                writer.writeheader()
+                writer.writerows(rows)
+        writer = csv.DictWriter(sys.stdout, fieldnames=rows[0].keys())
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 if __name__ == "__main__":

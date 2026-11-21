@@ -1,7 +1,0 @@
-input,input_bytes,distinct_bytes,archive_bytes,ratio,median_encode_ms,repeats
-repeated_pattern_4k,4096,7,1403,0.3425,1.851,7
-english_like_4k,4096,28,2580,0.6299,2.955,7
-uniform_bytes_4k,4096,256,6309,1.5403,6.198,7
-repeated_pattern_64k,65536,7,20908,0.319,30.75,7
-english_like_64k,65536,28,36935,0.5636,43.05,7
-uniform_bytes_64k,65536,256,68026,1.038,83.785,7

@@ -1,76 +1,86 @@
 # Huffman File Compression
 
-A small Python capstone project that compresses files with Huffman coding and restores them exactly. It demonstrates frequency counting, priority-queue tree construction, prefix codes, bit packing, decoding, file-size analysis, and basic runtime experiments.
+**Student:** Sushant Kumar · **Roll No.:** 2501010290  
+**Course:** B.Tech CSE Core · **Subject:** Design and Analysis of Algorithms (DAA)  
+**Teacher:** Anvi Aggrawal
 
-## Run it
+This project implements lossless Huffman coding for files. It counts byte frequencies, builds a Huffman tree with a min-heap, packs variable-length codes into a binary archive, restores the original bytes, and measures compression size and encoding time.
 
-Requires Python 3.10 or newer. No third-party packages are needed.
+## Project Structure
+
+```text
+huffman-file-compression/
+├── huffman.py   # Huffman algorithm, file I/O, and benchmark command
+├── sample.txt   # Sample text file for immediate testing
+└── README.md    # Usage, algorithm, complexity, and results
+```
+
+## Requirements
+
+- Python 3.10 or newer
+- No third-party packages
+
+## Compress and Decompress
+
+Run these commands in the VS Code terminal from this folder:
 
 ```bash
 python huffman.py compress sample.txt sample.huf
 python huffman.py decompress sample.huf restored.txt
 ```
 
-The encoder accepts any file, including UTF-8 text. Compression works on the file's bytes so every input byte is preserved. The output is a custom `HUF1` archive containing a JSON frequency table and the packed bitstream. Keep the `.huf` file with its original header; the decoder needs the frequency table to rebuild the tree.
+Compression reports the source size, archive size, compression ratio, space saved, and encoding time. The program processes bytes, so UTF-8 text and arbitrary byte values are preserved. The `.huf` archive contains a `HUF1` signature, a JSON frequency table with the original byte count, and a packed bitstream.
 
-## Run the checks and experiment
+## Benchmark
+
+Run the included reproducible size and timing comparison:
 
 ```bash
-python -m unittest -v
-python benchmark.py
+python huffman.py benchmark
+python huffman.py benchmark --repeats 10 --csv results.csv
 ```
 
-The benchmark uses six deterministic synthetic inputs, seven repeats per case, and reports the median encoding time. Its CSV is included as a sample run; timings vary with the computer and Python version. Run it again to measure your own machine.
+The benchmark compares repeated text, English-like text, and seeded uniformly distributed bytes at 4 KiB and 64 KiB. It reports archive-to-input ratio and median encoding time. A ratio below `1.0` means the archive is smaller. Timing depends on the computer, Python version, and background activity.
 
-## What the algorithm does
+### Sample Results
 
-1. Count each byte's occurrences.
-2. Put each distinct byte into a min-priority queue, ordered by frequency.
+One run of the included deterministic cases produced these measurements. Times are illustrative; rerun the benchmark for timings on your computer.
+
+| Input | Input bytes | Distinct bytes | Archive bytes | Ratio | Median encode time |
+|---|---:|---:|---:|---:|---:|
+| Repeated pattern, 4 KiB | 4,096 | 7 | 1,403 | 0.3425 | 1.851 ms |
+| English-like text, 4 KiB | 4,096 | 28 | 2,580 | 0.6299 | 2.955 ms |
+| Uniform bytes, 4 KiB | 4,096 | 256 | 6,309 | 1.5403 | 6.198 ms |
+| Repeated pattern, 64 KiB | 65,536 | 7 | 20,908 | 0.3190 | 30.750 ms |
+| English-like text, 64 KiB | 65,536 | 28 | 36,935 | 0.5636 | 43.050 ms |
+| Uniform bytes, 64 KiB | 65,536 | 256 | 68,026 | 1.0380 | 83.785 ms |
+
+Repeated patterns compress well because frequent bytes receive short codes. Uniform random bytes have little frequency skew, so their encoded bits do not compensate for the frequency-table header; small files can therefore grow.
+
+## How the Algorithm Works
+
+1. Count the occurrences of each input byte.
+2. Add each distinct byte to a min-heap ordered by frequency.
 3. Repeatedly remove the two least-frequent nodes and join them under a parent whose frequency is their sum.
-4. Read left edges as `0` and right edges as `1`; each leaf's root-to-leaf path is its code.
-5. Replace each input byte with its code and pack bits into output bytes.
-6. During decompression, rebuild the same tree from the frequency table and walk it one bit at a time. Stop after the original byte count is restored.
+4. Traverse the completed tree: left edges mean `0`, right edges mean `1`. Each leaf's path is that byte's code.
+5. Replace each source byte with its code and pack the bits into output bytes.
+6. For decompression, rebuild the tree from the stored frequencies and walk the bits until the original byte count is restored.
 
-Common bytes tend to receive shorter codes. Huffman codes are prefix-free, so no code is the beginning of another code; this makes the bitstream unambiguous.
+The greedy tree-building step combines the two least-frequent nodes each time. Codes are prefix-free because only leaves represent bytes; no byte code is the prefix of another, so decoding is unambiguous.
 
 ## Complexity
 
-Let `n` be the number of input bytes and `k` the number of distinct byte values (`k <= 256`). Counting and encoding/decoding take `O(n)` time for this byte alphabet. Building the tree takes `O(k log k)` time and `O(k)` extra space. The code table and tree use `O(k)` space; the implementation also keeps the input and output buffers in memory, so total working memory is `O(n + k)`. The archive header adds metadata overhead, which is why tiny files may grow.
+Let `n` be the number of input bytes and `k` the number of distinct byte values (`k <= 256`). Frequency counting and processing the encoded data take `O(n)` time for this fixed byte alphabet. Tree construction takes `O(k log k)` time using the min-heap. The tree and code table use `O(k)` space. This implementation keeps source and result buffers in memory, for `O(n + k)` working space.
 
-## Important result to explain
+## Code Walkthrough
 
-Huffman coding is lossless but does not guarantee that every input shrinks. The included benchmark shows that repeated and English-like inputs compress well, while uniformly distributed bytes may stay similar in size or grow because the frequency table and archive header cost space. This is an expected limitation, not a decoding error.
+- `Node` stores a frequency, an optional byte symbol, and child references.
+- `build_tree` applies the greedy choice with `heapq`; the order counter makes equal-frequency ties deterministic.
+- `make_codes` traverses the tree and assigns a prefix-free bit string to every byte.
+- `encode_bytes` writes the frequency metadata and packs code bits into bytes.
+- `decode_bytes` validates the archive, recreates the tree, and reconstructs the original data.
+- `compress_file` and `decompress_file` provide the file interface. The `benchmark` command measures size ratios and median encoder runtime.
 
-## Viva preparation
+## Scope
 
-**Why does a min-heap help?** It efficiently selects the two smallest frequencies at every tree-building step; insertion and removal take `O(log k)`.
-
-**Why are codes unambiguous?** A Huffman tree assigns codes only to leaves. No leaf is an ancestor of another leaf, so no symbol's code is a prefix of another symbol's code.
-
-**Why can output be larger?** The encoded bits may not save enough space to cover the frequency table and container header. Uniform data has little frequency skew to exploit.
-
-**How do you know decompression is correct?** The decoder restores exactly the recorded input length and checks that the decoded symbol counts match the stored frequency table. Tests also check byte-for-byte round trips.
-
-**What is the key tradeoff?** Huffman coding finds optimal prefix-code lengths for the known symbol frequencies, but the decoder needs those frequencies (or an equivalent tree) stored with the compressed data.
-
-## Archive format and limitations
-
-The format is for teaching and is not a replacement for ZIP, gzip, or production archivers. It uses a four-byte `HUF1` signature, a four-byte big-endian header length, a JSON header with original length and byte frequencies, and a byte-aligned bit payload. Unused bits at the end of the last payload byte are zero padding. The original length tells the decoder when to stop. There is no checksum, encryption, streaming mode, or protection against all hostile inputs; use established archive formats for important data.
-
-## Project contents
-
-- `huffman.py` — compressor, decompressor, tree construction, and code generation.
-- `test_huffman.py` — correctness and edge-case checks.
-- `benchmark.py` — repeatable size and timing experiment.
-- `benchmark_results.csv` — sample results from the included deterministic inputs.
-- `sample.txt` — small file for a quick demonstration.
-- `REPORT.md` — project report and oral explanation.
-
-## Student details
-
-- **Student:** Sushant Kumar
-- **Roll number:** 2501010290
-- **Course:** B.Tech CSE Core
-- **Subject:** Design and Analysis of Algorithms (DAA)
-- **Teacher:** Anvi Aggrawal
-
+This is a teaching format, not a replacement for ZIP or gzip. It is lossless, but compression is not guaranteed for every file. The archive has no checksum, encryption, or streaming support. Use established archive software for important data.
