@@ -22,11 +22,24 @@ huffman-file-compression/
 
 ## Compress and Decompress
 
-Run these commands in the VS Code terminal from this folder:
+Open the VS Code terminal (**Terminal → New Terminal**) and make sure it is
+in this project folder. On Windows, check that Python is available with
+`py --version` (Python 3.10 or newer is required). Then run:
 
-```bash
-python huffman.py compress sample.txt sample.huf
-python huffman.py decompress sample.huf restored.txt
+```powershell
+py huffman.py compress sample.txt sample.huf
+py huffman.py decompress sample.huf restored.txt
+```
+
+If `py` is not recognized but `python --version` works, replace `py` with
+`python` in the commands. If neither command works, install Python 3.10 or
+newer from python.org, enable the option to add Python to PATH during setup,
+then reopen the terminal.
+
+To check the restored file against the original in PowerShell, run:
+
+```powershell
+Get-FileHash sample.txt, restored.txt
 ```
 
 Compression reports the source size, archive size, compression ratio, space saved, and encoding time. The program processes bytes, so UTF-8 text and arbitrary byte values are preserved. The `.huf` archive contains a `HUF1` signature, a JSON frequency table with the original byte count, and a packed bitstream.
